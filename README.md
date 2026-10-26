@@ -1,323 +1,599 @@
-<div align="center">
+# AGRO PROFIT — Complete Project Audit, Enhancement, and Documentation
 
-# Plant Disease Detection
+## Project Overview
 
-**AI-powered plant disease detection system using deep learning and computer vision.**
+Project name: AGRO PROFIT
+Full title: Farmer Profit Analysis & Market Intelligence System
+Category: Agricultural Technology, Data Analytics, and Market Intelligence
+Academic context: B.Tech Computer Science Engineering, Semester VII
+Institution: Amity University Mumbai
+Internship organization: Talking Crooks
 
-[![Live Demo](https://img.shields.io/badge/%F0%9F%A4%97%20Spaces-Live%20Demo-blue)](https://huggingface.co/spaces/workface/plant-disease-detection)
-[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
-[![TensorFlow](https://img.shields.io/badge/TensorFlow-2.12-FF6F00?logo=tensorflow&logoColor=white)](https://www.tensorflow.org/)
-[![Gradio](https://img.shields.io/badge/Gradio-4.x-F97316?logo=gradio&logoColor=white)](https://gradio.app/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Validation Accuracy](https://img.shields.io/badge/val%20accuracy-99.84%25-brightgreen)](#model-details)
+## Primary Objective
 
-</div>
+Inspect the entire existing AGRO PROFIT repository, understand its actual implementation, identify and fix errors, improve the user interface, validate the agricultural profit calculation logic, and create comprehensive, professional project documentation.
 
----
+Use the Plant Disease Detection README provided as a reference for documentation quality, structure, technical depth, and presentation.
 
-## Overview
+**Important:** The reference README describes a different project. Do not copy its TensorFlow, EfficientNet, Gradio, or plant disease classification architecture into AGRO PROFIT.
 
-Plant Disease Detection is an end-to-end deep-learning pipeline that classifies a leaf photograph into one of **38 disease classes spanning 14 crop species** — from **Apple Scab** to **Tomato Yellow Leaf Curl Virus**. The model is a **transfer-learned EfficientNetB0** fine-tuned on the [New Plant Diseases Dataset](https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset) (~88,000 images), reaching **~99.84% validation accuracy** on the reference run.
+Preserve AGRO PROFIT's existing architecture and improve the actual implementation.
 
-The repo ships everything needed to reproduce the model and serve it: the **training notebook**, an **inference package**, an **export script**, and a **Gradio web app** that is deployed live on Hugging Face Spaces.
-
-> **Try it now without installing anything:** [https://huggingface.co/spaces/workface/plant-disease-detection](https://huggingface.co/spaces/workface/plant-disease-detection)
+Do not replace functioning modules with mock implementations or introduce hardcoded market prices.
 
 ---
 
-## Features
-
-- **38-class multi-disease classifier** across 14 crops (Apple, Tomato, Grape, Corn, Potato, Pepper, Strawberry, Cherry, Peach, Soybean, Squash, Raspberry, Blueberry, Orange).
-- **Transfer learning with EfficientNetB0** — ImageNet-pretrained backbone, last 20 layers fine-tuned.
-- **Production-quality inference module** — thread-safe lazy loading, EXIF-aware preprocessing, bounded-memory image handling, and structured prediction output (top-1 + top-3 + healthy flag + raw label).
-- **Interactive Gradio UI** with bundled example leaves and a top-3 confidence breakdown.
-- **Clean separation of concerns** — training notebook, export script, and runtime app are decoupled.
-- **Hardened cold-boot weight download** — large model artifacts live in a GitHub Release rather than the repo, fetched with timeout, retry/backoff, size sanity check, and optional `MODEL_SHA256` integrity verification.
-- **Defensive Gradio shimming** for known upstream JSON-schema bugs in `gradio_client` 4.44.x.
-- **Reproducible setup** — pinned `requirements.txt` and a `.env.example` for Kaggle credentials.
-
----
-
-## Architecture & Workflow
-
-```text
-                ┌─────────────────────────┐
-                │  Kaggle: 88k leaf imgs  │
-                │  38 classes, 14 crops   │
-                └─────────────┬───────────┘
-                              │  download via Kaggle API
-                              ▼
-   ┌───────────────────────────────────────────────────────────┐
-   │  Plant Leaf Disease Detection.ipynb                       │
-   │  ─ load datasets (224×224, batch 32, categorical)         │
-   │  ─ build EfficientNetB0 + GAP + Dense(38, softmax)        │
-   │  ─ fine-tune last 20 layers (Adam, categorical CE)        │
-   │  ─ EarlyStopping / ReduceLROnPlateau / ModelCheckpoint    │
-   └─────────────┬─────────────────────────────────────────────┘
-                 │  trained weights
-                 ▼
-        ┌─────────────────────┐         ┌──────────────────────┐
-        │  export_model.py    │  ────►  │  GitHub Release      │
-        │  → .keras + classes │         │  plant_disease_model │
-        └─────────┬───────────┘         └──────────┬───────────┘
-                  │                                │
-                  │   app/class_names.json         │  cold-boot
-                  │   (committed)                  │  download
-                  ▼                                ▼
-         ┌──────────────────────────────────────────────┐
-         │  app.py  (Gradio UI)                         │
-         │   └─ app/predict.py  → top-1, top-3, healthy │
-         └──────────────────────────────────────────────┘
-                              │
-                              ▼
-                ┌─────────────────────────┐
-                │   🤗 Hugging Face Space  │
-                └─────────────────────────┘
-```
-
-### Model details
-
-| Component        | Value                                                      |
-| ---------------- | ---------------------------------------------------------- |
-| Backbone         | EfficientNetB0 (ImageNet weights, `include_top=False`)     |
-| Head             | `GlobalAveragePooling2D` → `Dense(38, softmax)`            |
-| Input            | 224 × 224 × 3, batch size 32, `label_mode='categorical'`   |
-| Fine-tuning      | Last 20 backbone layers unfrozen                            |
-| Loss / optimizer | `categorical_crossentropy` / Adam                           |
-| Callbacks        | `EarlyStopping(patience=3)`, `ReduceLROnPlateau(0.2, p=2)`, `ModelCheckpoint(save_best_only=True)`, `TensorBoard` |
-| Reference val acc| **~99.84%**                                                 |
-
----
-
-## Installation
-
-> Python **3.10+** recommended (TensorFlow 2.12 supports up to 3.11).
-
-```bash
-# 1. Clone
-git clone https://github.com/apoorvrajdev/plant-disease-detection.git
-cd plant-disease-detection
-
-# 2. Create a virtual environment
-python -m venv .venv
-.venv\Scripts\activate           # Windows PowerShell
-# source .venv/bin/activate      # macOS / Linux
+# PHASE 1: INSPECT THE ENTIRE REPOSITORY
 
-# 3. Install dependencies
-pip install -r requirements.txt
+Inspect all relevant project files before making changes.
 
-# 4. (Optional) Provide Kaggle credentials for dataset download
-copy .env.example .env           # Windows
-# cp .env.example .env           # macOS / Linux
-# then fill in KAGGLE_USERNAME and KAGGLE_KEY
-```
+Examine:
+
+* package.json and lockfiles
+* README.md
+* Source code and components
+* React pages and routing
+* TypeScript interfaces and types
+* API endpoints and serverless functions
+* Supabase configuration and database schemas
+* Environment variable handling
+* Agricultural market data integrations
+* Agmarknet and data.gov.in integrations
+* Profit calculation functions
+* Transport cost calculations
+* Charts, maps, tables, and dashboards
+* Error handling and loading states
+* Existing tests
+* Deployment configuration
+* Assets and images
+* GitHub Actions or CI workflows, if present
 
----
+Identify the actual framework, dependencies, data flow, and deployment environment.
 
-## Usage
+Do not assume a feature works simply because its button or interface exists.
 
-### Option A — Run the live demo (no install)
+Create an internal audit checklist and fix the actual issues you discover.
 
-Open the Hugging Face Space, drop a leaf photo, and read the top-3 predictions:
-**[https://huggingface.co/spaces/workface/plant-disease-detection](https://huggingface.co/spaces/workface/plant-disease-detection)**
+Never expose API keys, passwords, database credentials, or other secrets in documentation or logs.
 
-### Option B — Run the Gradio app locally
+# PHASE 2: FIX ERRORS AND VALIDATE FUNCTIONALITY
 
-```bash
-pip install -r requirements.txt
-python export_model.py        # only needed if plant_disease_model.keras isn't already on disk
-python app.py                 # opens http://127.0.0.1:7860
-```
+Inspect the project for:
 
-If `plant_disease_model.keras` is missing, the app will automatically pull it from the GitHub Release on first launch.
+1. TypeScript compilation errors.
+2. React rendering errors.
+3. Incorrect hook usage.
+4. Broken navigation and routes.
+5. Invalid API requests.
+6. Missing environment variables.
+7. Incorrect Supabase queries.
+8. Missing or broken images.
+9. Incorrect loading and error states.
+10. Responsive layout problems.
+11. Console errors.
+12. Accessibility issues.
+13. Security vulnerabilities.
+14. Incorrect agricultural calculations.
+15. Inconsistent or outdated documentation.
 
-### Option C — Retrain from scratch
+Fix problems in the existing source code.
 
-1. Download the dataset:
+Use the repository's existing package manager and scripts whenever possible.
 
-   ```bash
-   pip install kaggle
-   kaggle datasets download -d vipoooool/new-plant-diseases-dataset --unzip -p .
-   ```
+Run the available checks:
 
-   You'll need a Kaggle API token (`~/.kaggle/kaggle.json`, or `KAGGLE_USERNAME` / `KAGGLE_KEY` env vars — see [`.env.example`](.env.example)).
+* TypeScript type checking.
+* ESLint or the configured linter.
+* Unit tests.
+* Production build.
+* Additional integration tests where feasible.
 
-2. Open `Plant Leaf Disease Detection.ipynb` in Jupyter or VS Code and execute cells top-to-bottom.
+Do not claim that a test passed unless you actually ran it.
 
-   > ⚠ **Patch the dataset paths first.** The notebook uses the original training-machine paths (`E:/MINICONDA_FILES/...`). Replace them with the in-repo layout:
-   >
-   > ```python
-   > train_dir = 'New Plant Diseases Dataset/New Plant Diseases Dataset(Augmented)/train'
-   > test_dir  = 'New Plant Diseases Dataset/New Plant Diseases Dataset(Augmented)/valid'
-   > data_dir  = 'New Plant Diseases Dataset/test/test'
-   > ```
+If an external API or service cannot be tested, clearly document the limitation.
 
-3. Once the notebook finishes, `python export_model.py` packages the trained weights into `plant_disease_model.keras` and writes the canonical `app/class_names.json`.
+# PHASE 3: CREATE A PROFESSIONAL AGRICULTURAL TECHNOLOGY WEBSITE
 
-### Programmatic inference
+Upgrade the existing AGRO PROFIT interface into a polished, modern agricultural market intelligence platform.
 
-```python
-from PIL import Image
-from app.predict import predict
+The website should look like a professional product suitable for farmers, agricultural businesses, market analysts, internship evaluators, and recruiters.
 
-img = Image.open("examples/Tomato___Early_blight.jpg")
-result = predict(img)
+## Design direction
 
-print(result["crop"], "—", result["condition"], f"({result['confidence']*100:.2f}%)")
-# Tomato — Early Blight (99.83%)
-```
+Use a modern, clean, agricultural visual identity.
 
-`predict()` returns a structured dict:
+Suggested palette:
 
-```python
-{
-  "crop":       "Tomato",
-  "condition":  "Early Blight",
-  "is_healthy": False,
-  "confidence": 0.9983,
-  "top_3":      [{"crop": ..., "condition": ..., "prob": ...}, ...],
-  "raw_label":  "Tomato___Early_blight",
-}
-```
+* Deep forest green: #14532D
+* Primary green: #16A34A
+* Light green: #DCFCE7
+* Warm off-white: #FAFAF5
+* Dark text: #172018
+* Amber accent: #F59E0B
 
----
+Use the existing design system where appropriate and maintain visual consistency.
 
-## Sample Predictions
+Include:
 
-Three real predictions from the live Space, spanning three different diseases across two crops:
+* Responsive navigation.
+* A compelling homepage hero section.
+* A clear project introduction.
+* A prominent profit calculator entry point.
+* Agricultural commodity and market information.
+* Dashboard previews where real data is available.
+* Clear feature cards.
+* Charts and visual comparisons.
+* Data source attribution.
+* A professional footer.
+* Mobile-friendly navigation.
+* Loading skeletons.
+* Empty states.
+* Useful error messages.
+* Accessible forms and controls.
 
-**Diseased Potato leaf → `Potato — Early Blight` at 100.00% confidence**
+Use authentic agricultural imagery when appropriate.
 
-![Potato Early Blight prediction on the live Space](docs/sample-potato-early-blight.png)
+Avoid excessive gradients, unnecessary animations, generic AI-generated statistics, fake testimonials, and decorative charts that suggest nonexistent data.
 
-**Heavily blighted Tomato leaf → `Tomato — Late Blight` at 89.18% confidence**
+All navigation elements and action buttons must work.
 
-![Tomato Late Blight prediction on the live Space](docs/sample-tomato-late-blight.png)
+Do not redesign the application in a way that removes existing working features.
 
-> Runner-up on this case was *Tomato — Early Blight* at 10.60% — a sensible Tomato/Tomato confusion since both diseases produce dark lesions. The top-3 panel always exposes these alternatives so you can sanity-check edge cases.
+# PHASE 4: VALIDATE THE AGRO PROFIT CALCULATOR
 
-**Tomato leaf with curling and yellowing → `Tomato — Tomato Yellow Leaf Curl Virus` at 100.00% confidence**
+The calculator is a core component of the project.
 
-![Tomato Yellow Leaf Curl Virus prediction on the live Space](docs/sample-tomato-yellow-leaf-curl-virus.png)
+Users should be able to select their source state and mandi and their destination state and mandi.
 
-> TYLCV is a whitefly-transmitted virus that causes severe yield loss in commercial tomato production — one of the more economically important diseases in the dataset.
+The application should use the selected locations rather than silently substituting the user's current location.
 
----
+Support the actual commodities and fields available in the project's data sources.
 
-## Screenshots
+Where the required data is available, display:
 
-> Drop additional UI screenshots into [`docs/`](docs/) and reference them here.
+* Commodity name.
+* Source state.
+* Source mandi.
+* Destination state.
+* Destination mandi.
+* Source market price.
+* Destination market price.
+* Quantity.
+* Transport distance.
+* Transport cost.
+* Production expenses.
+* Loading and unloading costs.
+* Other optional expenses.
+* Total estimated expenses.
+* Gross revenue.
+* Estimated net profit or loss.
+* Profit or loss per quintal.
+* Profit or loss per tonne.
+* Profit margin percentage.
 
-| | |
-| :---: | :---: |
-| ![Sample 1](docs/sample-potato-early-blight.png) | ![Sample 2](docs/sample-tomato-late-blight.png) |
-| *Potato — Early Blight* | *Tomato — Late Blight* |
+Clearly distinguish actual market data from user-entered expenses and estimates.
 
----
+## Calculation formulas
 
-## Dataset
+Let:
 
-This project trains on the **[New Plant Diseases Dataset (Augmented)](https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset)** by [vipoooool](https://www.kaggle.com/vipoooool) on Kaggle — about **88,000 labelled leaf images** spanning **38 classes across 14 plant species**. It is an augmented derivative of the [PlantVillage](https://github.com/spMohanty/PlantVillage-Dataset) dataset.
+* Q = quantity in quintals.
+* Ps = source purchase price per quintal.
+* Pd = destination selling price per quintal.
+* T = transport cost.
+* E = other expenses.
 
-The dataset is **not committed** to this repo (see [`.gitignore`](.gitignore)).
+Calculate:
 
----
+Purchase cost = Q × Ps
 
-## Project Layout
+Gross sales revenue = Q × Pd
 
-```text
-.
-├── LICENSE                              # MIT
-├── README.md                            # this file
-├── requirements.txt                     # pinned deps (TF 2.12 + Gradio + HF Hub)
-├── .env.example                         # template for Kaggle creds (copy to .env)
-├── .gitignore                           # excludes dataset, weights, secrets, caches
-├── Plant Leaf Disease Detection.ipynb   # main training pipeline notebook
-├── export_model.py                      # one-shot export of .keras + class_names.json
-├── app.py                               # Gradio entry point (HF Space app_file)
-├── app/                                 # inference package
-│   ├── __init__.py
-│   ├── class_names.json                 # canonical 38-class order (committed)
-│   ├── model_utils.py                   # lazy weight download from GH Release
-│   └── predict.py                       # thread-safe load + structured predict()
-├── examples/                            # bundled leaf photos shown in the Gradio UI
-├── docs/                                # README screenshots (sample predictions)
-└── New Plant Diseases Dataset/          # gitignored — Kaggle data
-```
+Total expenses = Purchase cost + T + E
 
----
+Net profit or loss = Gross sales revenue − Total expenses
 
-## Production Hardening (2026-05-26 audit)
+Profit or loss per quintal = Net profit or loss ÷ Q
 
-A focused ML systems audit was performed on the inference and deployment layers. The pipeline (train/inference transform parity, class ordering, lazy-loading correctness) validated cleanly; the changes below address real defects in inference robustness and cold-boot reliability rather than cosmetic refactors.
+Profit margin = (Net profit or loss ÷ Gross sales revenue) × 100, provided gross sales revenue is greater than zero.
 
-### Inference (`app/predict.py`)
+Handle zero and invalid quantities safely.
 
-- **EXIF orientation is now honoured** via `PIL.ImageOps.exif_transpose` before RGB conversion. Phone uploads frequently store landscape pixels plus an orientation tag; without this fix the model received rotated leaves and silently regressed on real field photos.
-- **Single-image latency path** switched from `model.predict(x, verbose=0)` to `model(x, training=False)`. Eliminates per-request Keras dispatch/callback overhead — the supported low-latency path at batch size 1.
-- **Input-type guard** — `predict()` now raises a clear `TypeError` on non-PIL inputs instead of failing deep inside `.convert()`.
-- **Bounded memory on oversized uploads** — images with a longest edge above 2048 px are downscaled with `PIL.Image.thumbnail` *before* the `float32` cast, capping the intermediate allocation regardless of upload size.
-- **Model/labels desync detection** — `load_model()` now asserts `model.output_shape[-1] == 38` in addition to the existing class-count check, so a mis-uploaded release asset fails loudly instead of silently corrupting every prediction.
+Do not count purchase cost twice.
 
-### Weight download (`app/model_utils.py`)
+### Transport calculation
 
-- **Connect timeout** of 30 s — cold start no longer hangs indefinitely on a stalled CDN.
-- **Retry with exponential backoff** (3 attempts) for transient network failures.
-- **Explicit `User-Agent`** — avoids redirect/CDN rejections of the default `Python-urllib/x.y` UA.
-- **Minimum-size sanity check** (1 MB floor) — an HTML error page masquerading as the asset is rejected with a useful message instead of being handed to the Keras loader.
-- **Optional `MODEL_SHA256` env var** — when set, the downloaded `.keras` is SHA-256 verified and deleted on mismatch. Defence-in-depth against tampered/corrupted weights, since `.keras` files can execute arbitrary code via Lambda layers.
+The latest project specification uses an indicative transport rate of ₹2,500 per kilometre per tonne.
 
-### Environment variables
+Equivalent rates:
 
-| Variable            | Purpose                                                                 |
-| ------------------- | ----------------------------------------------------------------------- |
-| `MODEL_RELEASE_URL` | Override the default GitHub Release URL for `plant_disease_model.keras`.|
-| `MODEL_SHA256`      | Optional hex SHA-256 of the model asset. Strongly recommended in prod.  |
+* ₹250 per kilometre per quintal.
+* ₹25 per kilometre per kilogram.
 
-### Validated (no change required)
+For distance D in kilometres and quantity Q in quintals:
 
-- Train/inference transform parity — both paths use bilinear resize to 224×224 on RGB at `[0, 255]`; EfficientNetB0's built-in `Rescaling` + `Normalization` layers (visible in the notebook's `model.summary`) make raw uint8 the correct input contract. No `preprocess_input` call is needed.
-- Class ordering — alphabetical `tf.data` directory listing matches `sorted(...)` in `export_model.py` and the committed `app/class_names.json`.
-- Thread-safe lazy model loading — double-checked locking around `_MODEL_CACHE` is correct under the GIL.
+Transport cost = D × Q × ₹250
 
----
+Example:
 
-## Future Improvements
+Distance: 100 km
+Quantity: 10 quintals
+Transport rate: ₹250 per km per quintal
 
-- [ ] **Grad-CAM / saliency maps** to visualise *why* the model made a prediction.
-- [ ] **TensorFlow Lite / ONNX export** for on-device mobile inference.
-- [ ] **Confusion-matrix dashboard** + per-class precision/recall on a held-out test set.
-- [ ] **Test-time augmentation (TTA)** to harden predictions on noisy field photos.
-- [ ] **Robustness study** on photos with cluttered backgrounds, multiple leaves, and partial occlusion (current model is trained on isolated leaves on a plain background).
-- [ ] **Active-learning loop** — flag low-confidence predictions for human re-labelling.
-- [ ] **Severity estimation** in addition to disease classification (e.g. % leaf area affected).
-- [ ] **REST API** wrapper (FastAPI) alongside the Gradio UI for programmatic integration.
-- [ ] **CI workflow** — automated lint, unit tests on `predict()`, and a smoke-test of the Gradio app.
-- [ ] **Multilingual UI** for use by farmers in regional languages.
+Transport cost = 100 × 10 × ₹250 = ₹2,50,000.
 
----
+**Important:** This is the stated indicative rate, not a verified universal commercial trucking rate. Flag it for confirmation because actual freight rates depend on vehicle capacity, route, load, market conditions, and whether the quote is per trip or per unit of distance.
 
-## Contributors
+Do not silently change the configured transport rate.
 
-> *Originally developed as a collaborative university project by Apoorv Raj and Tejaswi Raj.*
+Add appropriate validation and tests for the chosen calculation model.
 
-| Contributor | Role |
-| ----------- | ---- |
-| **Apoorv Raj** ([@apoorvrajdev](https://github.com/apoorvrajdev)) | Co-developer — model training, inference pipeline, deployment |
-| **Tejaswi Raj** | Co-developer — data preparation, notebook authoring, evaluation |
+# PHASE 5: VALIDATE MARKET DATA INTEGRATIONS
 
-Pull requests and issues are welcome. If you build on this work, a citation or a link back is appreciated.
+Inspect the existing integrations before changing them.
 
----
+Potential data sources include:
 
-## Acknowledgements
+* Agmarknet.
+* data.gov.in.
+* Existing agricultural market APIs.
+* Local agricultural datasets included in the repository.
+* User-provided market information.
 
-- **Dataset:** [New Plant Diseases Dataset (Augmented)](https://www.kaggle.com/datasets/vipoooool/new-plant-diseases-dataset) by *vipoooool* on Kaggle, derived from [PlantVillage](https://github.com/spMohanty/PlantVillage-Dataset).
-- **Backbone:** [EfficientNet](https://arxiv.org/abs/1905.11946) (Tan & Le, 2019).
-- **Frameworks:** [TensorFlow / Keras](https://www.tensorflow.org/), [Gradio](https://gradio.app/), [Hugging Face Spaces](https://huggingface.co/spaces).
+Verify the actual endpoints, response formats, field mappings, units, and update timestamps.
 
----
+For each market price, preserve available metadata such as:
 
-## License
+* Commodity.
+* Variety.
+* Market.
+* District.
+* State.
+* Arrival date.
+* Minimum price.
+* Maximum price.
+* Modal price.
+* Original price unit.
 
-[MIT License](LICENSE) © 2026 Apoorv Raj and Tejaswi Raj.
+Display the source and latest available data date where possible.
+
+Handle unavailable data gracefully.
+
+Do not fabricate current mandi prices, transport distances, market availability, or API responses.
+
+If a service is unavailable, explain the problem and provide a clear retry or fallback state.
+
+Never represent sample data as live market data.
+
+# PHASE 6: ADD USEFUL AGRICULTURAL MARKET INTELLIGENCE
+
+Inspect the existing application before adding or changing features.
+
+Where feasible, provide:
+
+1. Commodity price comparison.
+2. Source-versus-destination price comparison.
+3. Net profit and loss analysis.
+4. Expense breakdown charts.
+5. Historical price trends when historical data exists.
+6. Market and district comparisons.
+7. Quantity-based profit estimates.
+8. Downloadable calculation reports.
+9. Search and filtering.
+10. Clear data source and freshness indicators.
+
+If the repository contains the large historical market-price dataset, inspect its schema and optimize queries and processing rather than loading unnecessary records into the browser.
+
+Do not create artificial historical trends or claim predictive forecasting unless an actual validated model exists.
+
+# PHASE 7: WRITE A COMPREHENSIVE README.md
+
+Use the Plant Disease Detection README as a structural reference.
+
+Create a polished README with the following sections.
+
+## 1. Project Header
+
+Include:
+
+* AGRO PROFIT.
+* Farmer Profit Analysis & Market Intelligence System.
+* A concise project description.
+* Technology badges based on verified dependencies.
+* Repository link, if known.
+* Live demo badge only if a working public deployment exists.
+* Build or test badges only if backed by actual workflows.
+* License badge only if a license exists.
+
+Do not invent a deployment URL or claim a license that the repository does not contain.
+
+## 2. Overview
+
+Explain the agricultural problem.
+
+Farmers may observe higher selling prices in another mandi or state but need to understand whether the price difference remains profitable after transport, purchase, handling, and other expenses.
+
+Explain how AGRO PROFIT helps users compare markets and estimate net returns.
+
+Clearly identify the system as a decision-support tool rather than a guarantee of agricultural profitability.
+
+## 3. Problem Statement
+
+Describe:
+
+* Agricultural market price variability.
+* Differences between source and destination prices.
+* Transport and handling expenses.
+* Challenges in comparing net profitability.
+* The need for accessible market intelligence.
+
+## 4. Objectives
+
+Describe the project's goals in terms of price comparison, profit calculation, market transparency, data visualization, and informed agricultural decisions.
+
+## 5. Key Features
+
+Document only verified features.
+
+Potential features include:
+
+* Agricultural commodity selection.
+* State and mandi selection.
+* Market price comparison.
+* Profit and loss calculator.
+* Transport expense calculation.
+* Expense breakdown.
+* Historical market analysis.
+* Interactive dashboards.
+* Responsive web interface.
+* Exportable results.
+
+Mark incomplete functionality as planned rather than implemented.
+
+## 6. Technology Stack
+
+Inspect package.json, source files, configuration, and deployment files to identify the actual technologies.
+
+Potential categories:
+
+* Frontend.
+* Programming language.
+* UI framework.
+* Styling.
+* Charts and maps.
+* Backend.
+* Database.
+* Market data providers.
+* Hosting and deployment.
+* Testing.
+
+Do not claim that a library is used unless it is present in the project.
+
+## 7. System Architecture
+
+Create a Mermaid architecture diagram that accurately represents the actual application.
+
+For example, where supported by the implementation:
+
+User → React interface → API/serverless functions → Market data providers or database → Validated data → Profit calculation engine → Results and charts.
+
+Adapt the diagram to the real architecture.
+
+## 8. Application Workflow
+
+Document the actual user journey from selecting a commodity and source market to comparing destination prices, calculating costs, and viewing estimated profit or loss.
+
+Include validation and error-handling behavior.
+
+## 9. Profit Calculation Methodology
+
+Explain all units and formulas.
+
+Include an illustrative numerical example and distinguish purchase costs, sales revenue, transport expenses, and additional costs.
+
+Use a consistent definition of profit margin.
+
+Explain any limitations of the transport cost assumptions.
+
+## 10. Data Sources and Dataset
+
+Document actual market data providers and local datasets.
+
+Include:
+
+* Source name.
+* Dataset purpose.
+* Available fields.
+* Units.
+* Update frequency, if verified.
+* Data access requirements.
+* Attribution and usage restrictions.
+
+Do not invent dataset statistics.
+
+## 11. Project Structure
+
+Generate a directory tree based on the actual repository.
+
+Explain the purpose of important files and directories.
+
+Exclude node_modules, generated build output, secrets, and large irrelevant datasets.
+
+## 12. Installation and Setup
+
+Provide verified instructions for Windows and, if practical, macOS/Linux.
+
+Include:
+
+* Prerequisites.
+* Repository cloning.
+* Dependency installation.
+* Environment configuration.
+* Database or Supabase configuration, if applicable.
+* Local development.
+* Production build.
+* Testing.
+
+Use the actual scripts from package.json.
+
+## 13. Environment Variables
+
+Document required and optional environment variables by examining the code.
+
+For each variable, explain its purpose and whether it is needed for local development or production.
+
+Provide a safe .env.example only where appropriate.
+
+Never include real credentials.
+
+Do not expose server-only API keys in frontend variables.
+
+## 14. Usage Guide
+
+Explain how to use the application.
+
+Include the actual user workflow and examples with explicitly labelled illustrative inputs.
+
+## 15. Screenshots and Demo
+
+Use real screenshots from the running application where available.
+
+Include:
+
+* Homepage.
+* Main dashboard.
+* Profit calculator.
+* Market comparison.
+* Calculation results.
+* Mobile layout.
+
+Do not reference screenshots that do not exist.
+
+Do not create fabricated screenshots and present them as real application output.
+
+Include a live demo link only when verified.
+
+## 16. Example Calculation
+
+Provide a reproducible example using clearly labelled illustrative values.
+
+Show:
+
+* Purchase cost.
+* Gross sales revenue.
+* Transport expenses.
+* Additional expenses.
+* Total expenses.
+* Net profit or loss.
+* Profit per quintal.
+* Profit margin.
+
+Ensure the arithmetic is correct and consistent with the implemented formulas.
+
+## 17. Testing and Validation
+
+Document the tests actually executed.
+
+Include type checking, linting, unit tests, production builds, and integration tests where available.
+
+Clearly identify any checks that remain incomplete.
+
+## 18. Security
+
+Document relevant security practices, including:
+
+* Secret management.
+* Input validation.
+* API error handling.
+* Access controls, if implemented.
+* Safe database access.
+* Dependency maintenance.
+* Appropriate handling of user-entered data.
+
+Do not claim security certification or comprehensive security auditing without evidence.
+
+## 19. Limitations
+
+Describe relevant limitations such as market data availability, price freshness, transport cost uncertainty, missing expenses, and variation between estimated and actual market returns.
+
+Only include limitations relevant to the actual implementation.
+
+## 20. Future Improvements
+
+Possible improvements include:
+
+* Regional-language support.
+* Mobile-friendly farmer workflows.
+* Historical market trend analysis.
+* Market alerts.
+* Better transport cost estimation.
+* Weather and seasonal context.
+* Downloadable reports.
+* Improved accessibility.
+* Automated testing.
+* Validated predictive models.
+
+Clearly distinguish future work from completed features.
+
+## 21. Contributors
+
+Inspect existing repository attribution.
+
+Do not invent contributors or reassign credit for other people's work.
+
+Add project ownership information only where supported.
+
+## 22. Acknowledgements
+
+Credit actual data providers, libraries, and other resources used.
+
+Follow their attribution requirements.
+
+## 23. License
+
+Use the license present in the repository.
+
+If there is no license, state that the licensing status needs to be determined rather than inventing one.
+
+# PHASE 8: TEST THE FINAL RESULT
+
+After all modifications:
+
+1. Run the production build.
+2. Run TypeScript checks.
+3. Run linting.
+4. Run available unit tests.
+5. Test the calculator using known values.
+6. Check zero quantity and invalid inputs.
+7. Verify responsive behavior.
+8. Check browser console errors.
+9. Check navigation and links.
+10. Confirm environment variables are documented.
+11. Check README links and screenshot paths.
+12. Verify that no credentials are exposed.
+13. Check that documented commands match package.json.
+14. Confirm that no existing features have been unintentionally removed.
+
+Fix any new problems introduced during the enhancement.
+
+# FINAL REPORT
+
+When finished, provide:
+
+* Files inspected.
+* Files modified.
+* Bugs discovered and fixed.
+* UI improvements.
+* Calculator validation results.
+* Build, lint, and test results.
+* Market data integration status.
+* Documentation changes.
+* Remaining limitations.
+* Commands to run the project locally.
+* Any configuration or deployment steps still required.
+
+Do not stop after generating a plan or changing the README.
+
+Make the changes directly in the existing repository, verify them, and provide an honest completion report.
+
+**Final requirement:** Preserve AGRO PROFIT's existing identity and functionality while elevating its code quality, documentation, usability, and visual presentation to a professional standard.
